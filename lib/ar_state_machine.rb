@@ -15,7 +15,7 @@ module ARStateMachine
                       if: -> { state_changed? or (skipped_transition and skipped_transition.to_s == state.to_s) }
 
     after_update      :do_state_change_do_after_callbacks,
-                      if: -> { (rails52? ? saved_change_to_attribute?(:state) || changes.key?('state') : state_changed?) or (skipped_transition and skipped_transition.to_s == state.to_s) }
+                      if: -> { (saved_change_to_attribute?(:state) || changes.key?('state')) or (skipped_transition and skipped_transition.to_s == state.to_s) }
 
     after_commit      :do_state_change_do_after_commit_callbacks
 
@@ -41,24 +41,15 @@ module ARStateMachine
 
   private
 
-  def rails52?
-    return true if ActiveRecord::VERSION::MAJOR > 5
-    return true if ActiveRecord::VERSION::MAJOR == 5 && ActiveRecord::VERSION::MINOR >= 2
-
-    false
-  end
-
   def old_state
-    old_state = self.changed_attributes['state']
-
-    if rails52?
-      if self.saved_changes['state'].is_a? Array
-        old_state = self.saved_changes['state']&.last
-      elsif self.saved_changes['state'].is_a? String
-        old_state = self.saved_changes['state']
-      else
-        old_state = self.changed_attributes['state']
-      end
+    if self.changed_attributes.key?('state')
+      old_state = self.changed_attributes['state']
+    elsif self.saved_changes['state'].is_a? Array
+      old_state = self.saved_changes['state'].first.nil? ? self.saved_changes['state'].last : self.saved_changes['state'].first
+    elsif self.saved_changes['state'].is_a? String
+      old_state = self.saved_changes['state']
+    else
+      old_state = self.changed_attributes['state']
     end
 
     # we usually only want to create the state change if the state actually changes but
